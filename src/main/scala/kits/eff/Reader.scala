@@ -15,6 +15,12 @@ object Reader {
 
   def ask[I]: Eff[Reader[I], I] = Eff(new Ask[I])
 
+  def local[I, R >: Reader[I], A](f: I => I)(eff: Eff[R, A]): Eff[R, A] =
+    ask[I].flatMap { r0 =>
+      val r = f(r0)
+      run(r)(eff)
+    }
+
   case Ask[I]() extends Reader[I] {
     type Value = I
   }
