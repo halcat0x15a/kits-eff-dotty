@@ -1,13 +1,18 @@
 package kits.eff
 
 object Main {
-  def hoge[R]: implicit Reader[Int] <:< R => implicit Writer[String] <:< R => Eff[R, Int] = for {
-    i <- Reader.ask
+  val hoge: Eff[Reader[Int] | Writer[String], Int] = for {
+    i <- Reader.ask[Int]
     _ <- Writer.tell(i.toString)
   } yield i + 1
 
   def main(args: Array[String]): Unit = {
-    println(Eff.run(Reader.run(0)(Writer.run(hoge[Reader[Int] | Writer[String] | Mu]))))
-    println(Eff.run(Writer.run(Reader.run(0)(hoge[Reader[Int] | Writer[String] | Mu]))))
+    val r1: Eff[Writer[String], Int] = Reader.run(0)(hoge)
+    val r2: Eff[Reader[Int], (List[String], Int)] = Writer.run(hoge)
+    val r3: Eff[Nothing, (List[String], Int)] = Reader.run(0)(r2)
+    val r4: (List[String], Int) = Eff.run(r3)
+    val r5: (List[String], Int) = Eff.run(Reader.run(0)(r2))
+    val r6: Eff[Nothing, (List[String], Int)] = (Reader.run(0) compose Writer.run[String])(hoge)
+    val r7: (List[String], Int) = Eff.run(Reader.run(0) compose Writer.run[String] apply hoge)
   }
 }
