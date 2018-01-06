@@ -15,24 +15,59 @@ trait Handler { self =>
     }
 }
 
-trait HandleRelay[F <: Effect](tag: Class[F]) extends Handler {
-  type Result[A]
+object Handler {
+  def apply[F <: Effect](handleRelay: HandleRelay[F]): Handler { type Result[A] = handleRelay.Result[A]; type Union[R] = F | R } =
+    new Handler {
+      type Result[A] = handleRelay.Result[A]
+      type Union[R] = F | R
+      def apply[R, A](eff: Eff[F | R, A]): Eff[R, Result[A]] =
+        eff match {
+          case Eff.Pure(v) => handleRelay.pure(v)
+          case Eff.Impure(u, k) => u match {
+            case fa: F if handleRelay.isInstance(fa) =>
+              handleRelay.bind(fa)(a => apply(k(a)))
+            case r: R =>
+              Eff.Impure[R, Any, Result[A]](r, Arrs.Leaf((a: Any) => apply(k(a))))
+          }
+        }
+    }
 
-  type Union[R] = F | R
+  def apply[S, F <: Effect](s: S, handleRelayS: HandleRelayS[S, F]): Handler { type Result[A] = handleRelayS.Result[A]; type Union[R] = F | R } =
+    new Handler {
+      type Result[A] = handleRelayS.Result[A]
+      type Union[R] = F | R
+      def apply[R, A](eff: Eff[F | R, A]): Eff[R, Result[A]] = {
+        def go(s: S, eff: Eff[F | R, A]): Eff[R, Result[A]] =
+          eff match {
+            case Eff.Pure(v) => handleRelayS.pure(s, v)
+            case Eff.Impure(u, k) => u match {
+              case fa: F if handleRelayS.isInstance(fa) =>
+                handleRelayS.bind(s, fa)((s, a) => go(s, k(a)))
+              case r: R =>
+                Eff.Impure[R, Any, Result[A]](r, Arrs.Leaf((a: Any) => go(s, k(a))))
+            }
+          }
+        go(s, eff)
+      }
+    }
+}
+
+trait HandleRelay[F <: Effect] {
+  type Result[A]
 
   def pure[R, A](a: A): Eff[R, Result[A]]
 
   def bind[R, A, B](fa: F { type Value = A })(k: A => Eff[R, Result[B]]): Eff[R, Result[B]]
 
-  def apply[R, A](eff: Eff[F | R, A]): Eff[R, Result[A]] = {
-    eff match {
-      case Eff.Pure(v) => pure(v)
-      case Eff.Impure(u, k) => u match {
-        case fa: F if tag.isInstance(fa) =>
-          bind(fa)(a => apply(k(a)))
-        case r: R =>
-          Eff.Impure[R, Any, Result[A]](r, Arrs.Leaf((a: Any) => apply(k(a))))
-      }
-    }
-  }
+  def isInstance(fa: Any): Boolean
+}
+
+trait HandleRelayS[S, F <: Effect] {
+  type Result[A]
+
+  def pure[R, A](s: S, a: A): Eff[R, Result[A]]
+
+  def bind[R, A, B](s: S, fa: F { type Value = A })(k: (S, A) => Eff[R, Result[B]]): Eff[R, Result[B]]
+
+  def isInstance(fa: Any): Boolean
 }

@@ -3,21 +3,20 @@ package kits.eff
 enum class Writer[W] extends Effect
 
 object Writer {
-  def run[W]: Handler { type Result[A] = (List[W], A); type Union[R] = Writer[W] | R } =
-    new HandleRelay[Writer[W]](classOf[Writer[W]]) {
-      type Result[A] = (List[W], A)
-      def pure[R, A](a: A) = Eff.Pure((Nil, a))
-      def bind[R, A, B](fa: Writer[W] { type Value = A })(k: A => Eff[R, (List[W], B)]) =
+  def tell[W](value: W): Eff[Writer[W], Unit] = Eff(new Put(value))
+
+  def run[W]: Handler { type Result[A] = (Vector[W], A); type Union[R] = Writer[W] | R } =
+    Handler(Vector.empty[W], new HandleRelayS[Vector[W], Writer[W]] {
+      type Result[A] = (Vector[W], A)
+      def pure[R, A](s: Vector[W], a: A) = Eff.Pure((s, a))
+      def bind[R, A, B](s: Vector[W], fa: Writer[W] { type Value = A })(k: (Vector[W], A) => Eff[R, (Vector[W], B)]) =
         fa match {
-          case Tell(v) => k(()).map {
-            case (w, a) => (v :: w, a)
-          }
+          case Put(v) => k(s :+ v, ())
         }
-    }
+      def isInstance(fa: Any) = classOf[Writer[W]].isInstance(fa)
+    })
 
-  def tell[W](value: W): Eff[Writer[W], Unit] = Eff(new Tell(value))
-
-  case Tell[W](value: W) extends Writer[W] {
+  case Put[W](value: W) extends Writer[W] {
     type Value = Unit
   }
 }
