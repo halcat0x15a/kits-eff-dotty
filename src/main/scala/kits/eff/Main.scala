@@ -17,9 +17,12 @@ object Main {
     val r2: Eff[Reader[Int], (Vector[String], Int)] = Writer.run(hoge)
     val r3: Eff[Nothing, (Vector[String], Int)] = Reader.run(0)(r2)
     val r4: (Vector[String], Int) = Eff.run(r3)
-    val r5: (Vector[String], Int) = Eff.run(Reader.run(0)(r2))
-    val r6: Eff[Nothing, (Vector[String], Int)] = (Reader.run(0) compose Writer.run[String])(hoge)
-    val r7: (Vector[String], Int) = Eff.run(Reader.run(0) compose Writer.run[String] apply hoge)
-    val r8: (Int, Int) = Eff.run(State.run(0)(fuga))
+    assert(r4 == (Vector("0") -> 1))
+
+    val r5: (Vector[String], Int) = Eff.run(Reader.run(0) compose Writer.run apply hoge)
+    assert(r5 == (Vector("0") -> 1))
+
+    val r6: (Int, Int) = Eff.run(State.run(0)(fuga))
+    assert(r6 == (1 -> 2))
   }
 }
