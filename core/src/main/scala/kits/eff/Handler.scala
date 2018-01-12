@@ -23,11 +23,12 @@ object Handler {
       def apply[R, A](eff: Eff[F | R, A]): Eff[R, Result[A]] =
         eff match {
           case Eff.Pure(v) => handleRelay.pure(v)
+          case Eff.Lazy(v, k) => Eff.Lazy(v, Arrs.Leaf(a => apply(k(a))))
           case Eff.Impure(u, k) => u match {
             case fa: F if handleRelay.isInstance(fa) =>
-              handleRelay.bind(fa)(a => apply(k(a)))
+              handleRelay.bind(fa)(a => Eff.Lazy(a, Arrs.Leaf(a => apply(k(a)))))
             case r: R =>
-              Eff.Impure[R, Any, Result[A]](r, Arrs.Leaf((a: Any) => apply(k(a))))
+              Eff.Impure[R, Any, Result[A]](r, Arrs.Leaf(a => apply(k(a))))
           }
         }
     }
@@ -40,9 +41,10 @@ object Handler {
         def go(s: S, eff: Eff[F | R, A]): Eff[R, Result[A]] =
           eff match {
             case Eff.Pure(v) => handleRelayS.pure(s, v)
+            case Eff.Lazy(v, k) => Eff.Lazy(v, Arrs.Leaf(a => go(s, k(a))))
             case Eff.Impure(u, k) => u match {
               case fa: F if handleRelayS.isInstance(fa) =>
-                handleRelayS.bind(s, fa)((s, a) => go(s, k(a)))
+                handleRelayS.bind(s, fa)((s, a) => Eff.Lazy(a, Arrs.Leaf(a => go(s, k(a)))))
               case r: R =>
                 Eff.Impure[R, Any, Result[A]](r, Arrs.Leaf((a: Any) => go(s, k(a))))
             }

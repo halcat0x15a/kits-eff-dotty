@@ -10,6 +10,7 @@ enum class Arrs[+R, A, B] extends (A => Eff[R, B]) {
         case Arrs.View.Cons(f, g) => f(a) match {
           case Eff.Pure(b) => go(g, b)
           case Eff.Impure(r, h) => Eff.Impure(r, h ++ g)
+          case Eff.Lazy(v, h) => Eff.Lazy(v, h ++ g)
         }
       }
     go(this.asInstanceOf[Arrs[R, Any, B]], a)
