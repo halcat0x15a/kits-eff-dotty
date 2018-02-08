@@ -2,7 +2,7 @@ package kits.eff
 
 import scala.annotation.tailrec
 
-enum class Arrs[+R, A, B] extends (A => Eff[R, B]) {
+sealed abstract class Arrs[+R[_], A, B] extends (A => Eff[R, B]) {
   def apply(a: A): Eff[R, B] = {
     @tailrec def go(arrs: Arrs[R, Any, B], a: Any): Eff[R, B] =
       arrs.view match {
@@ -18,22 +18,24 @@ enum class Arrs[+R, A, B] extends (A => Eff[R, B]) {
 
   def view: Arrs.View[R, A, B]
 
-  def :+[S, C](f: B => Eff[S, C]): Arrs[R | S, A, C] = Arrs.Node(this, Arrs.Leaf(f))
+  def :+[S[_], C](f: B => Eff[S, C]): Arrs[[A] => R[A] | S[A], A, C] = Arrs.Node(this, Arrs.Leaf(f))
 
-  def ++[S, C](f: Arrs[S, B, C]): Arrs[R | S, A, C] = Arrs.Node(this, f)
+  def ++[S[_], C](f: Arrs[S, B, C]): Arrs[[A] => R[A] | S[A], A, C] = Arrs.Node(this, f)
 }
 
 object Arrs {
-  enum View[+R, A, B] {
-    case One[R, A, B](arr: A => Eff[R, B]) extends View[R, A, B]
-    case Cons[R, A, B, C](arr: A => Eff[R, B], arrs: Arrs[R, B, C]) extends View[R, A, C]
+  sealed abstract class View[+R[_], A, B]
+
+  object View {
+    case class One[R[_], A, B](arr: A => Eff[R, B]) extends View[R, A, B]
+    case class Cons[R[_], A, B, C](arr: A => Eff[R, B], arrs: Arrs[R, B, C]) extends View[R, A, C]
   }
 
-  case Leaf[R, A, B](arr: A => Eff[R, B]) extends Arrs[R, A, B] {
+  case class Leaf[R[_], A, B](arr: A => Eff[R, B]) extends Arrs[R, A, B] {
     def view = View.One(arr)
   }
 
-  case Node[R, A, B, C](left: Arrs[R, A, B], right: Arrs[R, B, C]) extends Arrs[R, A, C] {
+  case class Node[R[_], A, B, C](left: Arrs[R, A, B], right: Arrs[R, B, C]) extends Arrs[R, A, C] {
     def view = {
       @tailrec def go(left: Arrs[R, A, Any], right: Arrs[R, Any, C]): View[R, A, C] =
         left match {

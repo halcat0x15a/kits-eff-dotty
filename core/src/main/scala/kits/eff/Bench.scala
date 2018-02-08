@@ -15,8 +15,8 @@ class Bench {
 }
 
 object Bench {
-  def benchEff(ns: Seq[Int]): Eff[State[Int], Int] =
-    ns.foldLeft(Eff.Pure[State[Int], Int](1)) { (acc, n) =>
+  def benchEff(ns: Seq[Int]): Eff[[A] => State[Int, A], Int] =
+    ns.foldLeft(Eff.Pure(1): Eff[[A] => State[Int, A], Int]) { (acc, n) =>
       if n % 5 == 0 then for {
         acc <- acc
         s <- Reader.ask[Int]

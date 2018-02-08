@@ -1,15 +1,18 @@
 package kits.eff
 
 object State {
-  def run[S](state: S): Handler { type Result[A] = (S, A); type Union[R] = State[S] | R } =
-    Handler(state, new HandleRelayS[S, Reader[S] | Writer[S]] {
-      type Result[A] = (S, A)
-      def pure[R, A](s: S, a: A) = Eff.Pure((s, a))
-      def bind[R, A, B](s: S, fa: (Reader[S] | Writer[S]) { type Value = A })(k: (S, A) => Eff[R, (S, B)]) =
+  def run[R[_], S, A](state: S)(eff: Eff[[A] => State[S, A] | R[A], A]): Eff[R, (S, A)] =
+    Eff.handleRelayS[[A] => State[S, A], R, S, A, (S, A)](state, eff)(new Eff.HandlerS[[A] => State[S, A], R, S, A, (S, A)] {
+      def pure(s: S, a: A) = Eff.Pure((s, a))
+      def bind[T](s: S, fa: State[S, T])(k: (S, T) => Eff[R, (S, A)]) =
         fa match {
           case Reader.Get() => k(s, s)
           case Writer.Put(s) => k(s, ())
         }
-      def isInstance(fa: Any) = classOf[Reader[S]].isInstance(fa) || classOf[Writer[S]].isInstance(fa)
+      def unapply(u: State[S, A] | R[A]) =
+        u match {
+          case s: State[s, a] => Some(s)
+          case _ => None
+        }
     })
 }

@@ -1,22 +1,36 @@
 package kits.eff
 
-enum class Writer[W] extends Effect
+enum class Writer[W, A]
 
 object Writer {
-  def tell[W](value: W): Eff[Writer[W], Unit] = Eff(new Put(value))
+  def tell[W](value: W): Eff[[A] => Writer[W, A], Unit] = Eff(Put(value))
 
-  def run[W]: Handler { type Result[A] = (Vector[W], A); type Union[R] = Writer[W] | R } =
-    Handler(Vector.empty[W], new HandleRelayS[Vector[W], Writer[W]] {
-      type Result[A] = (Vector[W], A)
-      def pure[R, A](s: Vector[W], a: A) = Eff.Pure((s, a))
-      def bind[R, A, B](s: Vector[W], fa: Writer[W] { type Value = A })(k: (Vector[W], A) => Eff[R, (Vector[W], B)]) =
+  def runVec[R[_], W, A](eff: Eff[[A] => Writer[W, A] | R[A], A]): Eff[R, (Vector[W], A)] =
+    Eff.handleRelayS(Vector.empty[W], eff)(new Eff.HandlerS[[A] => Writer[W, A], R, Vector[W], A, (Vector[W], A)] {
+      def pure(s: Vector[W], a: A) = Eff.Pure((s, a))
+      def bind[T](s: Vector[W], fa: Writer[W, T])(k: (Vector[W], T) => Eff[R, (Vector[W], A)]) =
         fa match {
-          case Put(v) => k(s :+ v, ())
+          case Put(w) => k(s :+ w, ())
         }
-      def isInstance(fa: Any) = classOf[Writer[W]].isInstance(fa)
+      def unapply(u: Writer[W, A] | R[A]) = u match {
+        case w: Writer[w, a] => Some(w)
+        case _ => None
+      }
     })
 
-  case Put[W](value: W) extends Writer[W] {
-    type Value = Unit
-  }
+  def runList[R[_], W, A](eff: Eff[[A] => Writer[W, A] | R[A], A]): Eff[R, (List[W], A)] =
+    Eff.handleRelay(eff)(new Eff.Handler[[A] => Writer[W, A], R, A, (List[W], A)] {
+      def pure(a: A) = Eff.Pure((Nil, a))
+      def bind[T](fa: Writer[W, T])(k: T => Eff[R, (List[W], A)]) =
+        fa match {
+          case Put(w) => k(()).map { case (acc, a) => (w :: acc, a) }
+        }
+      def unapply(u: Writer[W, A] | R[A]) =
+        u match {
+          case w: Writer[w, a] => Some(w)
+          case _ => None
+        }
+    })
+
+  case Put[W](value: W) extends Writer[W, Unit]
 }
