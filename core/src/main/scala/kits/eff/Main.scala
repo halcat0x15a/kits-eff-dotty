@@ -1,5 +1,5 @@
 package kits.eff
-
+/*
 object Main {
   val hoge: Eff[[A] => Reader[Int, A] | Writer[String, A], Int] = for {
     i <- Reader.ask[Int]
@@ -22,3 +22,4 @@ object Main {
     assert(r3 == (1 -> 2))
   }
 }
+ */
